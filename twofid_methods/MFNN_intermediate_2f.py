@@ -4,6 +4,7 @@ import torch  # PyTorch main package (tensors, device management).
 import numpy as np  # Numerical computing (arrays, random numbers, vectorized ops).
 import torch.nn as nn  # Neural network layers and modules.
 from helpers_2f import get_device
+from tqdm import trange
 
 class IntermediateNet(nn.Module):
     """
