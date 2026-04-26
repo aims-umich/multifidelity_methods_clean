@@ -43,14 +43,6 @@ columns:
   y_tafter: ["T_after_onc"]
 
 # -----------------------
-# Experiment sample sizes
-# -----------------------
-experiments:
-  lf_sizes: [50, 100, 200, 500, 1000]
-  hf_sizes: [10, 20, 50, 100, 200]
-  seeds: [0, 1, 2]
-
-# -----------------------
 # 2-Fidelity hyperparameters (ONC-tuned)
 # -----------------------
 twofid:

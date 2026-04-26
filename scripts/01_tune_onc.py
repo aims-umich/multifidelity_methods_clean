@@ -1,11 +1,13 @@
 """
 01_tune_onc.py
 Hyperparameter tuning for all 2f/3f methods on ONC real data.
-Converted from hyperparameter_tuning_ONC_fixed.ipynb.
+Matches paper Section 2.4.2 exactly:
+  - Stage 1: tune hidden/lr on ALL inputs -> time_to_onc only
+  - alpha/lam carried forward from benchmark tuning (not re-tuned on ONC)
+  - Grid: layers [2,3,4], nodes [16,32,64,128], lr [1e-4,5e-4,1e-3], epochs=500 fixed
 
 Usage:
     python scripts/01_tune_onc.py
-    python scripts/01_tune_onc.py --config configs/onc_config.yaml
 """
 import argparse
 import sys
@@ -16,195 +18,168 @@ import numpy as np
 import pandas as pd
 import yaml
 
-# --- path setup ---
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from helpers_2f import limit_cpu_threads, r2_score
+from helpers_2f import limit_cpu_threads
 from sklearn.metrics import mean_squared_error
 
 from twofid_methods.GPmimic_2f import GPmimic
-from twofid_methods.MFGP_2f import MFGP
 from twofid_methods.MFNN_delta_2f import MFNN_Delta
 from twofid_methods.MFNN_flag_2f import MFNN_Flag
 from twofid_methods.MFNN_intermediate_2f import MFNN_Intermediate
 from twofid_methods.MFNN_threestep_2f import MFNN_3step
 from twofid_methods.MFNN_twostep_2f import MFNN_2step
+from threefid_methods.GPmimic_3f import GPmimic3f
+from threefid_methods.MFNN_flag_3f import MFNN_Flag3f
+from threefid_methods.MFNN_intermediate_3f import MFNN_Intermediate3f
+from src.datasets import load_onc_data, make_onc_dataset_2f_lf_hf, make_onc_dataset_3f
 
-from src.datasets import (
-    load_onc_data, make_onc_dataset_2f,
-    make_onc_dataset_2f_lf_hf, make_onc_dataset_2f_lf_mf, make_onc_dataset_2f_mf_hf,
-)
-
-
-# -----------------------
-# Hyperparameter grid
-# -----------------------
+# Grid matches Table 3 in paper exactly
 NUM_LAYERS = [2, 3, 4]
-NUM_NODES  = [64, 128]
-NUM_EPOCHS = [500]
-LRS        = [1e-4, 1e-3]
+NUM_NODES  = [16, 32, 64, 128]
+NUM_EPOCHS = 500
+LRS        = [1e-4, 5e-4, 1e-3]
 
 def make_hidden(n_layers, n_nodes):
     return tuple([n_nodes] * n_layers)
 
+def get_2f_methods(alpha, lam):
+    return [
+        {"name": "GPmimic",
+         "build": lambda D, h, lr, e: GPmimic(x_dim=D, hidden=h, lr=lr, epochs=e, alpha=alpha, lam=lam, verbose=False)},
+        {"name": "MF-NN-Delta",
+         "build": lambda D, h, lr, e: MFNN_Delta(x_dim=D, hidden=h, lr=lr, epochs=e, wd=0.0, verbose=False)},
+        {"name": "MFNN-Intermediate",
+         "build": lambda D, h, lr, e: MFNN_Intermediate(x_dim=D, hidden=h, hf_hidden=(h[0],), lr=lr, epochs=e, wd=0.0, alpha=alpha, lam=lam, verbose=False)},
+        {"name": "MFNN-Flag",
+         "build": lambda D, h, lr, e: MFNN_Flag(x_dim=D, hidden=h, lr=lr, epochs=e, wd=0.0, verbose=False)},
+        {"name": "MFNN-TwoStep",
+         "build": lambda D, h, lr, e: MFNN_2step(x_dim=D, hidden=h, lr=lr, epochs=e, wd=0.0, verbose=False)},
+        {"name": "MFNN-ThreeStep",
+         "build": lambda D, h, lr, e: MFNN_3step(x_dim=D, hidden_low=h, hidden_lin=(h[0],), hidden_high=(h[0],), lr=lr, epochs=e, wd=0.0, verbose=False)},
+    ]
 
-def tune_onc_methods(cfg, data, x_cols_list, y_col):
-    """
-    Grid search over hidden/lr/epochs for all NN methods on ONC data.
-    x_cols_list: list of input column lists to try
-    y_col: output column (list with one element)
-    """
+def get_3f_methods(w_h, w_m, w_l, lam):
+    return [
+        {"name": "GPmimic3f",
+         "build": lambda D, h, lr, e: GPmimic3f(x_dim=D, hidden=h, lr=lr, epochs=e, w_h=w_h, w_m=w_m, w_l=w_l, lam=lam, verbose=False)},
+        {"name": "MFNN-Flag3f",
+         "build": lambda D, h, lr, e: MFNN_Flag3f(x_dim=D, hidden=h, lr=lr, epochs=e, wd=0.0, verbose=False)},
+        {"name": "MFNN-Intermediate3f",
+         "build": lambda D, h, lr, e: MFNN_Intermediate3f(x_dim=D, hidden=h, lr=lr, epochs=e, wd=0.0, w_hf=w_h, w_mf=w_m, w_lf=w_l, lam=lam, verbose=False)},
+    ]
+
+def tune_methods(methods, data, x_cols, y_col, fidelity, n_lf=200, n_hf=50, seed=42):
     rows = []
     best_cfg_per_method = {}
 
-    methods = [
-        {
-            "name": "GPmimic",
-            "build": lambda D, hidden, lr, epochs: GPmimic(
-                x_dim=D, hidden=hidden, lr=lr, epochs=epochs,
-                alpha=0.1, lam=1e-4, verbose=False),
-        },
-        {
-            "name": "MF-NN-Delta",
-            "build": lambda D, hidden, lr, epochs: MFNN_Delta(
-                x_dim=D, hidden=hidden, lr=lr, epochs=epochs,
-                wd=0.0, verbose=False),
-        },
-        {
-            "name": "MFNN-Intermediate",
-            "build": lambda D, hidden, lr, epochs: MFNN_Intermediate(
-                x_dim=D, hidden=hidden, hf_hidden=(hidden[0],),
-                lr=lr, epochs=epochs, wd=0.0,
-                alpha=0.1, lam=1e-4, verbose=False),
-        },
-        {
-            "name": "MFNN-Flag",
-            "build": lambda D, hidden, lr, epochs: MFNN_Flag(
-                x_dim=D, hidden=hidden, lr=lr, epochs=epochs,
-                wd=0.0, verbose=False),
-        },
-    ]
+    for spec in methods:
+        name  = spec["name"]
+        build = spec["build"]
+        print(f"\n{'='*40}\nTUNING: {name}\n{'='*40}", flush=True)
 
-    for method_spec in methods:
-        method_name = method_spec["name"]
-        build_model  = method_spec["build"]
+        best_cfg  = None
+        best_rmse = None
 
-        print(f"\n{'='*40}")
-        print(f"TUNING: {method_name}  |  output: {y_col}")
-        print(f"{'='*40}", flush=True)
-
-        best_cfg       = None
-        best_mean_rmse = None
-
-        for L, H, E, lr in product(NUM_LAYERS, NUM_NODES, NUM_EPOCHS, LRS):
+        for L, H, lr in product(NUM_LAYERS, NUM_NODES, LRS):
             hidden = make_hidden(L, H)
-            total_rmse = 0.0
-            count = 0
+            try:
+                if fidelity == "2f":
+                    ds, (Xt, yt) = make_onc_dataset_2f_lf_hf(data, x_cols, y_col, n_lf, n_hf, seed)
+                    D = ds.Xl.shape[1]
+                    m = build(D, hidden, lr, NUM_EPOCHS)
+                    m.fit(ds.Xl, ds.yl, ds.Xh, ds.yh)
+                else:
+                    ds, (Xt, yt) = make_onc_dataset_3f(data, x_cols, y_col, n_lf, n_hf, n_hf, seed)
+                    D = ds.Xl.shape[1]
+                    m = build(D, hidden, lr, NUM_EPOCHS)
+                    m.fit(ds.Xl, ds.yl, ds.Xm, ds.ym, ds.Xh, ds.yh)
+                rmse = float(np.sqrt(mean_squared_error(yt, m.predict(Xt))))
+            except Exception as e:
+                print(f"  ERROR {L},{H},{lr}: {e}", flush=True)
+                rmse = float("inf")
 
-            for x_cols in x_cols_list:
-                # use lf+hf 2f dataset for tuning with moderate sizes
-                dataset, (Xtest, ytest) = make_onc_dataset_2f_lf_hf(
-                    data, x_cols, y_col, n_lf=200, n_hf=50, seed=42)
-                D = dataset.Xl.shape[1]
+            print(f"  layers={L}, nodes={H}, lr={lr} → RMSE={rmse:.4f}", flush=True)
+            rows.append({"Method": name, "layers": L, "nodes": H, "lr": lr, "RMSE": rmse})
 
-                model = build_model(D, hidden, lr, E)
-                model.fit(dataset.Xl, dataset.yl, dataset.Xh, dataset.yh)
-                ypred = model.predict(Xtest)
-                rmse_val = float(np.sqrt(mean_squared_error(ytest, ypred)))
+            if best_rmse is None or rmse < best_rmse:
+                best_rmse = rmse
+                best_cfg  = (L, H, lr)
 
-                rows.append({
-                    "Method": method_name, "x_cols": str(x_cols),
-                    "y_col": str(y_col), "layers": L, "nodes": H,
-                    "epochs": E, "lr": lr, "RMSE": rmse_val,
-                })
-                total_rmse += rmse_val
-                count += 1
-
-            mean_rmse = total_rmse / count
-            print(f"  layers={L}, nodes={H}, epochs={E}, lr={lr} → mean RMSE={mean_rmse:.4f}",
-                  flush=True)
-
-            if best_mean_rmse is None or mean_rmse < best_mean_rmse:
-                best_mean_rmse = mean_rmse
-                best_cfg = (L, H, E, lr)
-
-        best_cfg_per_method[method_name] = {
+        best_cfg_per_method[name] = {
             "hidden": list(make_hidden(best_cfg[0], best_cfg[1])),
-            "epochs": best_cfg[2],
-            "lr":     best_cfg[3],
-            "best_mean_rmse": best_mean_rmse,
+            "epochs": NUM_EPOCHS,
+            "lr":     float(best_cfg[2]),
+            "best_rmse": best_rmse,
         }
-        print(f"*** Best {method_name}: layers={best_cfg[0]}, nodes={best_cfg[1]}, "
-              f"epochs={best_cfg[2]}, lr={best_cfg[3]} (mean RMSE={best_mean_rmse:.4f})")
+        print(f"*** Best {name}: layers={best_cfg[0]}, nodes={best_cfg[1]}, lr={best_cfg[2]} (RMSE={best_rmse:.4f})")
 
     return pd.DataFrame(rows), best_cfg_per_method
 
+def write_best_to_config(cfg, best_2f, best_3f, config_path):
+    key_map_2f = {"GPmimic": "gpmimic", "MF-NN-Delta": "delta",
+                  "MFNN-Intermediate": "intermediate", "MFNN-Flag": "flag",
+                  "MFNN-TwoStep": "twostep", "MFNN-ThreeStep": "threestep"}
+    key_map_3f = {"GPmimic3f": "gpmimic3f", "MFNN-Flag3f": "flag3f",
+                  "MFNN-Intermediate3f": "intermediate3f"}
 
-# -----------------------
-# Entry point
-# -----------------------
+    for name, info in best_2f.items():
+        key = key_map_2f.get(name)
+        if key and key in cfg["twofid"]:
+            cfg["twofid"][key]["hidden"] = list(info["hidden"])
+            cfg["twofid"][key]["epochs"] = int(info["epochs"])
+            cfg["twofid"][key]["lr"]     = float(info["lr"])
+
+    for name, info in best_3f.items():
+        key = key_map_3f.get(name)
+        if key and key in cfg["threefid"]:
+            cfg["threefid"][key]["hidden"] = list(info["hidden"])
+            cfg["threefid"][key]["epochs"] = int(info["epochs"])
+            cfg["threefid"][key]["lr"]     = float(info["lr"])
+
+    with open(config_path, "w") as f:
+        yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
+    print(f"\nConfig updated → {config_path}")
+    print("02_run_onc.py will now use these automatically.")
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Tune 2f methods on ONC data")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/onc_config.yaml")
     parser.add_argument("--out",    default="outputs/results/tuning_onc.csv")
     args = parser.parse_args()
 
     cfg = yaml.safe_load(open(ROOT / args.config))
     limit_cpu_threads(cfg.get("cpu_threads", 4))
-
-    # Load data
-    data = load_onc_data(ROOT, cfg)
-
+    data    = load_onc_data(ROOT, cfg)
     col_cfg = cfg["columns"]
-    x_cols_list = [col_cfg["x_all"], col_cfg["x_temp"], col_cfg["x_temp_htc"]]
+
+    # Paper Section 2.4.2: ALL inputs -> time_to_onc only
+    x_cols = col_cfg["x_all"]
+    y_col  = col_cfg["y_onc"]
+
+    # alpha/lam from benchmark tuning Table 6 — carried forward, not re-tuned
+    alpha = 0.05
+    lam_2f = 1e-5   # GPmimic benchmark best
+    lam_inter = 0.1 # Intermediate benchmark best (use per-method in build fns)
 
     out_path = ROOT / args.out
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
     all_rows = []
-    # Accumulate best configs across both outputs — average the RMSE, keep the params
-    # from whichever output had the better (lower) mean RMSE per method
-    combined_best = {}
 
-    for y_col in [col_cfg["y_onc"], col_cfg["y_tafter"]]:
-        print(f"\n\n{'#'*50}")
-        print(f"OUTPUT: {y_col}")
-        print(f"{'#'*50}")
+    print("\n=== Stage 1: Tune 2f methods (All inputs -> Time to ONC) ===")
+    df_2f, best_2f = tune_methods(get_2f_methods(alpha=alpha, lam=lam_2f),
+                                   data, x_cols, y_col, fidelity="2f")
+    df_2f["fidelity"] = "2f"
+    all_rows.append(df_2f)
 
-        df, best = tune_onc_methods(cfg, data, x_cols_list, y_col)
-        df["output"] = str(y_col)
-        all_rows.append(df)
-
-        print(f"\nBest configs for {y_col}:")
-        for m, info in best.items():
-            print(f"  {m}: {info}")
-            # Keep params from whichever output gives lower RMSE for this method
-            if m not in combined_best or info["best_mean_rmse"] < combined_best[m]["best_mean_rmse"]:
-                combined_best[m] = info
+    print("\n=== Stage 1: Tune 3f methods (All inputs -> Time to ONC) ===")
+    df_3f, best_3f = tune_methods(get_3f_methods(w_h=0.5, w_m=0.3, w_l=0.2, lam=1e-4),
+                                   data, x_cols, y_col, fidelity="3f")
+    df_3f["fidelity"] = "3f"
+    all_rows.append(df_3f)
 
     pd.concat(all_rows).reset_index(drop=True).to_csv(out_path, index=False)
-    print(f"\nSaved tuning results to {out_path}")
+    print(f"\nSaved to {out_path}")
 
-    # -----------------------
-    # Write best params back into config so 02_run_onc.py picks them up automatically
-    # -----------------------
-    method_to_cfg_key = {
-        "GPmimic":           "gpmimic",
-        "MF-NN-Delta":       "delta",
-        "MFNN-Intermediate": "intermediate",
-        "MFNN-Flag":         "flag",
-    }
-
-    for method_name, info in combined_best.items():
-        key = method_to_cfg_key.get(method_name)
-        if key and key in cfg["twofid"]:
-            cfg["twofid"][key]["hidden"] = list(info["hidden"])
-            cfg["twofid"][key]["epochs"] = int(info["epochs"])
-            cfg["twofid"][key]["lr"]     = float(info["lr"])
-
-    config_path = ROOT / args.config
-    with open(config_path, "w") as f:
-        yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
-    print(f"\nConfig updated with best hyperparams → {config_path}")
-    print("02_run_onc.py will now use these automatically.")
+    write_best_to_config(cfg, best_2f, best_3f, ROOT / args.config)
