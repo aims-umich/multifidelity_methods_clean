@@ -1,0 +1,97 @@
+# configs/benchmarks_config.yaml
+# Hyperparameters for benchmark runs (2f and 3f)
+# Edit this file to change hyperparams — don't edit the scripts directly.
+
+cpu_threads: 4  # limit cluster CPU usage (passed to limit_cpu_threads)
+
+# -----------------------
+# 2-Fidelity hyperparameters
+# -----------------------
+twofid:
+  delta:
+    epochs: 2000
+    lr: 0.001
+    hidden: [64, 64, 64, 64]
+    wd: 0.0
+
+  flag:
+    epochs: 2000
+    lr: 0.001
+    hidden: [128, 128, 128, 128]
+    wd: 0.0
+
+  twostep:
+    epochs: 2000
+    lr: 0.001
+    hidden: [64, 64, 64, 64]
+    wd: 0.0
+
+  threestep:
+    epochs: 2000
+    lr: 0.001
+    hidden_low: [128, 128, 128, 128]
+    hidden_lin: [128]
+    hidden_high: [128]
+    wd: 0.0
+
+  gpmimic:
+    epochs: 2000
+    lr: 0.001
+    hidden: [128, 128, 128, 128]
+    alpha: 0.05
+    lam: 0.0005
+
+  intermediate:
+    epochs: 2000
+    lr: 0.001
+    hidden: [128, 128, 128]
+    hf_hidden: [128]
+    wd: 0.0
+    alpha: 0.05
+    lam: 0.0005
+
+# -----------------------
+# 3-Fidelity hyperparameters
+# -----------------------
+threefid:
+  gpmimic3f:
+    epochs: 2000
+    lr: 0.001
+    hidden: [128, 128, 128, 128]
+    w_h: 0.5
+    w_m: 0.3
+    w_l: 0.2
+    lam: 0.0001
+
+  intermediate3f:
+    epochs: 2000
+    lr: 0.001
+    hidden: [128, 128, 128, 128]
+    wd: 0.0
+    w_hf: 0.7
+    w_mf: 0.2
+    w_lf: 0.1
+    lam: 0.001
+
+  flag3f:
+    epochs: 2000
+    lr: 0.001
+    hidden: [128, 128, 128, 128]
+    wd: 0.0
+
+# -----------------------
+# Benchmark run settings
+# -----------------------
+run:
+  twofid:
+    n_low: 250
+    n_high: 50
+    n_low_hartmann6: 800   # larger for 6D
+    n_high_hartmann6: 150
+    seed_offset: 13        # seed = seed_offset + benchmark_index
+
+  threefid:
+    n_low: 200
+    n_medium: 100
+    n_high: 40
+    seed_offset: 0
