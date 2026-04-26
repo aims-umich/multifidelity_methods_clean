@@ -7,6 +7,13 @@ Usage:
     python scripts/01_tune_benchmarks.py
     python scripts/01_tune_benchmarks.py --out outputs/results/tuning_benchmarks.csv
 """
+
+import os
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["NUMEXPR_NUM_THREADS"] = "4"
+
 import argparse
 import sys
 from pathlib import Path

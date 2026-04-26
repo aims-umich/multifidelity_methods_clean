@@ -7,7 +7,15 @@ Final runs use 2000 epochs (paper Section 3).
 Usage:
     python scripts/02_run_onc.py
     python scripts/02_run_onc.py --fidelity 2f
+    
 """
+
+import os
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["NUMEXPR_NUM_THREADS"] = "4"
+
 import argparse
 import sys
 import time

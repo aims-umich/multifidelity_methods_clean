@@ -9,6 +9,13 @@ Usage:
     python scripts/02_run_benchmarks.py --fidelity 2f
     python scripts/02_run_benchmarks.py --fidelity 3f
 """
+
+import os
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["NUMEXPR_NUM_THREADS"] = "4"
+
 import argparse
 import sys
 import time

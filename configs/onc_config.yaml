@@ -1,104 +1,123 @@
-# configs/onc_config.yaml
-# Hyperparameters and settings for ONC (real data) runs.
-# Edit this file to change hyperparams — don't edit the scripts directly.
-
-cpu_threads: 4  # limit cluster CPU usage
-
-# -----------------------
-# Data paths (relative to project root)
-# -----------------------
+cpu_threads: 4
 data:
   low_fidelity:
-    inputs:  ONC_data/low_fidelity/inputs.csv
+    inputs: ONC_data/low_fidelity/inputs.csv
     outputs: ONC_data/low_fidelity/outputs.csv
   medium_fidelity:
-    inputs:  ONC_data/medium_fidelity/inputs.csv
+    inputs: ONC_data/medium_fidelity/inputs.csv
     outputs: ONC_data/medium_fidelity/outputs.csv
-    train_inputs:  ONC_data/medium_fidelity/mf_training_inputs.csv
+    train_inputs: ONC_data/medium_fidelity/mf_training_inputs.csv
     train_outputs: ONC_data/medium_fidelity/mf_training_outputs.csv
-    test_inputs:   ONC_data/medium_fidelity/mf_testing_inputs.csv
-    test_outputs:  ONC_data/medium_fidelity/mf_testing_outputs.csv
+    test_inputs: ONC_data/medium_fidelity/mf_testing_inputs.csv
+    test_outputs: ONC_data/medium_fidelity/mf_testing_outputs.csv
   high_fidelity:
-    inputs:  ONC_data/high_fidelity/inputs.csv
+    inputs: ONC_data/high_fidelity/inputs.csv
     outputs: ONC_data/high_fidelity/outputs.csv
-    train_inputs:  ONC_data/high_fidelity/hf_training_inputs.csv
+    train_inputs: ONC_data/high_fidelity/hf_training_inputs.csv
     train_outputs: ONC_data/high_fidelity/hf_training_outputs.csv
-    test_inputs:   ONC_data/high_fidelity/hf_testing_inputs.csv
-    test_outputs:  ONC_data/high_fidelity/hf_testing_outputs.csv
-
-# -----------------------
-# Input/output column groups
-# -----------------------
+    test_inputs: ONC_data/high_fidelity/hf_testing_inputs.csv
+    test_outputs: ONC_data/high_fidelity/hf_testing_outputs.csv
 columns:
-  x_all: ["Temperature (K)", "HTC (W/m^2K)", "Glass thickness (m)",
-           "Glass thermal conductivity (k:W/mK)", "Air Thermal conductivity (k:W/mK)",
-           "Air Viscosity (kg/ms)", "He Thermal conductivity (k:W/mK)", "He Viscosity (kg/ms)"]
-  x_temp: ["Temperature (K)"]
-  x_htc: ["HTC (W/m^2K)"]
-  x_temp_htc: ["Temperature (K)", "HTC (W/m^2K)"]
-  x_others: ["Glass thickness (m)", "Glass thermal conductivity (k:W/mK)",
-              "Air Thermal conductivity (k:W/mK)", "Air Viscosity (kg/ms)",
-              "He Thermal conductivity (k:W/mK)", "He Viscosity (kg/ms)"]
-  y_onc: ["time_to_onc"]
-  y_tafter: ["T_after_onc"]
-
-# -----------------------
-# 2-Fidelity hyperparameters (ONC-tuned)
-# -----------------------
+  x_all:
+  - Temperature (K)
+  - HTC (W/m^2K)
+  - Glass thickness (m)
+  - Glass thermal conductivity (k:W/mK)
+  - Air Thermal conductivity (k:W/mK)
+  - Air Viscosity (kg/ms)
+  - He Thermal conductivity (k:W/mK)
+  - He Viscosity (kg/ms)
+  x_temp:
+  - Temperature (K)
+  x_htc:
+  - HTC (W/m^2K)
+  x_temp_htc:
+  - Temperature (K)
+  - HTC (W/m^2K)
+  x_others:
+  - Glass thickness (m)
+  - Glass thermal conductivity (k:W/mK)
+  - Air Thermal conductivity (k:W/mK)
+  - Air Viscosity (kg/ms)
+  - He Thermal conductivity (k:W/mK)
+  - He Viscosity (kg/ms)
+  y_onc:
+  - time_to_onc
+  y_tafter:
+  - T_after_onc
 twofid:
   gpmimic:
-    epochs: 1000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128]
+    hidden:
+    - 128
+    - 128
+    - 128
     alpha: 0.05
-    lam: 0.00001
-
+    lam: 1.0e-05
   delta:
-    epochs: 1000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128, 128]
+    hidden:
+    - 128
+    - 128
+    - 128
+    - 128
     wd: 0.0
-
   flag:
-    epochs: 1000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128, 128]
+    hidden:
+    - 128
+    - 128
+    - 128
+    - 128
     wd: 0.0
-
   intermediate:
-    epochs: 1000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128, 128]
-    hf_hidden: [128]
+    hidden:
+    - 128
+    - 128
+    - 128
+    - 128
+    hf_hidden:
+    - 128
     wd: 0.0
     alpha: 0.05
     lam: 0.1
-
-# -----------------------
-# 3-Fidelity hyperparameters (ONC-tuned)
-# -----------------------
 threefid:
   gpmimic3f:
-    epochs: 2000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128, 128]
+    hidden:
+    - 64
+    - 64
+    - 64
+    - 64
     w_h: 0.5
     w_m: 0.3
     w_l: 0.2
     lam: 0.0001
-
   intermediate3f:
-    epochs: 2000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128, 128]
+    hidden:
+    - 128
+    - 128
+    - 128
+    - 128
     wd: 0.0
     w_hf: 0.7
     w_mf: 0.2
     w_lf: 0.1
     lam: 0.001
-
   flag3f:
-    epochs: 2000
+    epochs: 500
     lr: 0.001
-    hidden: [128, 128, 128, 128]
+    hidden:
+    - 128
+    - 128
+    - 128
+    - 128
     wd: 0.0

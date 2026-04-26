@@ -9,6 +9,13 @@ Matches paper Section 2.4.2 exactly:
 Usage:
     python scripts/01_tune_onc.py
 """
+
+import os
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["NUMEXPR_NUM_THREADS"] = "4"
+
 import argparse
 import sys
 from pathlib import Path
