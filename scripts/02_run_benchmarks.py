@@ -183,6 +183,9 @@ def run_2f_benchmarks(cfg):
         ("Borehole (8D)",)  + borehole_funcs(),
     ]
 
+    # benchmarks that need parity plots (paper Figures 4 and 5)
+    PARITY_BENCHMARKS_2F = {"Booth (2D)", "Borehole (8D)"}
+
     rows = []
     for i, (name, low, high, bounds) in enumerate(configs):
         print(f"\n  {name}", flush=True)
@@ -194,6 +197,15 @@ def run_2f_benchmarks(cfg):
         data = make_dataset(low, high, bounds, n_low=n_low, n_high=n_high, seed=seed)
         models, Xtest = run_2f_models(data, cfg)
         ytrue = high(Xtest).reshape(-1, 1)
+
+        # save raw predictions for parity plot benchmarks
+        if name in PARITY_BENCHMARKS_2F:
+            preds_dict = {"ytrue": ytrue}
+            for model_name, info in models.items():
+                preds_dict[model_name] = info["model"].predict(Xtest)
+            safe_name = name.replace(" ", "_").replace("(", "").replace(")", "")
+            np.save(out_path.parent / f"preds_2f_{safe_name}.npy",
+                    preds_dict, allow_pickle=True)
 
         for model_name, info in models.items():
             ypred = info["model"].predict(Xtest)
@@ -234,6 +246,15 @@ def run_3f_benchmarks(cfg):
                                n_high=run_cfg["n_high"], seed=seed)
         models, Xtest = run_3f_models(data, cfg)
         ytrue = high(Xtest).reshape(-1, 1)
+
+        # save raw predictions for parity plot (paper Figure 6 = Rosenbrock 2D)
+        if D == 2:
+            preds_dict = {"ytrue": ytrue}
+            for model_name, info in models.items():
+                preds_dict[model_name] = info["model"].predict(Xtest)
+            np.save(out_path.parent / f"preds_3f_Rosenbrock_{D}D.npy",
+                    preds_dict, allow_pickle=True)
+
         for model_name, info in models.items():
             rows.append({"Benchmark": name, "Model": model_name, "Fidelity": "3F",
                          **_metrics(ytrue, info["model"].predict(Xtest), info["time"])})
@@ -249,6 +270,15 @@ def run_3f_benchmarks(cfg):
                                n_high=run_cfg["n_high"], seed=seed)
         models, Xtest = run_3f_models(data, cfg)
         ytrue = high(Xtest).reshape(-1, 1)
+
+        # save raw predictions for parity plot (paper Figure 7 = Rastrigin 5D)
+        if D == 5:
+            preds_dict = {"ytrue": ytrue}
+            for model_name, info in models.items():
+                preds_dict[model_name] = info["model"].predict(Xtest)
+            np.save(out_path.parent / f"preds_3f_Rastrigin_{D}D.npy",
+                    preds_dict, allow_pickle=True)
+
         for model_name, info in models.items():
             rows.append({"Benchmark": name, "Model": model_name, "Fidelity": "3F",
                          **_metrics(ytrue, info["model"].predict(Xtest), info["time"])})
