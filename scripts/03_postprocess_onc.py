@@ -23,16 +23,23 @@ sys.path.insert(0, str(ROOT))
 # matches paper Table 2 exactly
 # -----------------------
 def classify_input(row):
-    """Map raw Inputs column to AllInputs / DominantInputs / NonDominantInputs."""
+    """Map raw Inputs column to AllInputs / DominantInputs / NonDominantInputs.
+    Matches paper Table 2 exactly:
+      - Dominant for ONC: Temp only
+      - Dominant for Tafter: Temp_HTC only
+      - NonDominant: Others only (all non-dominant params)
+      - Temp_HTC for ONC and Temp for Tafter are excluded from paper tables
+    """
     if row["Inputs"] == "AllInputs":
         return "AllInputs"
-    # Dominant: Temp for ONC, Temp_HTC for Tafter
     if row["Output"] == "ONC"    and row["Inputs"] == "Temp":
         return "DominantInputs"
     if row["Output"] == "Tafter" and row["Inputs"] == "Temp_HTC":
         return "DominantInputs"
-    # Everything else is non-dominant
-    return "NonDominantInputs"
+    if row["Inputs"] == "Others":
+        return "NonDominantInputs"
+    # Temp_HTC for ONC and Temp for Tafter — not shown in paper tables
+    return "Excluded"
 
 
 def load_results(csv_path):
@@ -60,12 +67,28 @@ def load_results(csv_path):
 def export_fixed_budget_table(df, combo, budget, out_dir, filename):
     """
     Fixed budget table — matches Tables 10, A13, A14 in paper.
-    Shows all input groups x all methods, both outputs side by side.
+    For LFHF combo, also includes 3F (LFMFHF) results at nearest budget.
     """
-    subset = df[
+    # get 2F rows for this combo/budget
+    subset_2f = df[
         (df["TotalBudget"] == budget) &
-        (df["Combo"] == combo)
+        (df["Combo"] == combo) &
+        (df["Fidelity"] == "2F")
     ].copy()
+
+    # get 3F rows — only for LFHF table (paper Table 10 includes 3F)
+    # 3F budget 298 ≈ 300, 3F budget 600/1200/1800 match exactly
+    if combo == "LFHF":
+        # find nearest 3F budget
+        budgets_3f = df[df["Fidelity"] == "3F"]["TotalBudget"].unique()
+        nearest_3f = min(budgets_3f, key=lambda x: abs(x - budget))
+        subset_3f = df[
+            (df["TotalBudget"] == nearest_3f) &
+            (df["Fidelity"] == "3F")
+        ].copy()
+        subset = pd.concat([subset_2f, subset_3f], ignore_index=True)
+    else:
+        subset = subset_2f
 
     if subset.empty:
         print(f"  No data for combo={combo} budget={budget}, skipping {filename}")
@@ -160,8 +183,12 @@ def plot_timing(df, out_dir):
         (df["Model"] == "MF-GP") &
         (df["Combo"] == "LFHF") &
         (df["Output"] == "ONC") &
-        (df["Inputs"] != "Temp_HTC")   # exclude Temp_HTC — dominant for Tafter not ONC
+        (df["Inputs"].isin(["AllInputs", "Temp", "Others"]))
     ].copy()
+
+    # map Inputs to display group names
+    input_map = {"AllInputs": "AllInputs", "Temp": "DominantInputs", "Others": "NonDominantInputs"}
+    df_mfgp["InputGroup"] = df_mfgp["Inputs"].map(input_map)
 
     if df_mfgp.empty:
         print("  No MF-GP LFHF ONC data for timing plot, skipping")
