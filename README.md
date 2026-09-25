@@ -20,6 +20,7 @@ multifidelity_methods_clean/
 │   ├── high_fidelity/
 │   ├── medium_fidelity/
 │   └── low_fidelity/
+|
 ├── twofid_methods/              # 2-fidelity MFNN implementations
 │   ├── MFGP_2f.py               # Multifidelity Gaussian Process (co-kriging)
 │   ├── GPmimic_2f.py            # GPmimic neural network
