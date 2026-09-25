@@ -77,7 +77,7 @@ def get_3f_methods(w_h, w_m, w_l, lam):
          "build": lambda D, h, lr, e: MFNN_Intermediate3f(x_dim=D, hidden=h, lr=lr, epochs=e, wd=0.0, w_hf=w_h, w_mf=w_m, w_lf=w_l, lam=lam, verbose=False)},
     ]
 
-def tune_methods(methods, data, x_cols, y_col, fidelity, n_lf=200, n_hf=50, seed=42):
+def tune_methods(methods, data, x_cols, y_col, fidelity, n_lf=500, n_mf=100, n_hf=50, seed=42):
     rows = []
     best_cfg_per_method = {}
 
@@ -98,7 +98,7 @@ def tune_methods(methods, data, x_cols, y_col, fidelity, n_lf=200, n_hf=50, seed
                     m = build(D, hidden, lr, NUM_EPOCHS)
                     m.fit(ds.Xl, ds.yl, ds.Xh, ds.yh)
                 else:
-                    ds, (Xt, yt) = make_onc_dataset_3f(data, x_cols, y_col, n_lf, n_hf, n_hf, seed)
+                    ds, (Xt, yt) = make_onc_dataset_3f(data, x_cols, y_col, n_lf, n_mf, n_hf, seed)
                     D = ds.Xl.shape[1]
                     m = build(D, hidden, lr, NUM_EPOCHS)
                     m.fit(ds.Xl, ds.yl, ds.Xm, ds.ym, ds.Xh, ds.yh)
@@ -176,13 +176,15 @@ if __name__ == "__main__":
 
     print("\n=== Stage 1: Tune 2f methods (All inputs -> Time to ONC) ===")
     df_2f, best_2f = tune_methods(get_2f_methods(alpha=alpha, lam=lam_2f),
-                                   data, x_cols, y_col, fidelity="2f")
+                                   data, x_cols, y_col, fidelity="2f", 
+                                   n_lf=500, n_hf=50)
     df_2f["fidelity"] = "2f"
     all_rows.append(df_2f)
 
     print("\n=== Stage 1: Tune 3f methods (All inputs -> Time to ONC) ===")
     df_3f, best_3f = tune_methods(get_3f_methods(w_h=0.5, w_m=0.3, w_l=0.2, lam=1e-4),
-                                   data, x_cols, y_col, fidelity="3f")
+                                   data, x_cols, y_col, fidelity="3f",
+                                   n_lf=500, n_mf=100, n_hf=50)
     df_3f["fidelity"] = "3f"
     all_rows.append(df_3f)
 

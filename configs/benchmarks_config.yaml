@@ -59,8 +59,8 @@ threefid:
     lr: 0.001
     hidden: [128, 128, 128, 128]
     w_h: 0.5
-    w_m: 0.3
-    w_l: 0.2
+    w_m: 0.2
+    w_l: 0.3
     lam: 0.0001
 
   intermediate3f:
@@ -91,7 +91,7 @@ run:
     seed_offset: 13        # seed = seed_offset + benchmark_index
 
   threefid:
-    n_low: 200
-    n_medium: 100
-    n_high: 40
+    n_low: 1000
+    n_medium: 300
+    n_high: 100
     seed_offset: 0
