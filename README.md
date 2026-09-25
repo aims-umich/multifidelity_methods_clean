@@ -5,6 +5,7 @@ This repository contains the implementation and experimental pipeline for the pa
 > **Multifidelity Surrogate Modeling of Depressurized Loss of Forced Cooling in High-temperature Gas Reactors**
 > Meredith Eaheart, Majdi I. Radaideh — University of Michigan
 > [arXiv:2603.14143](https://arxiv.org/abs/2603.14143)
+> (https://www.sciencedirect.com/science/article/pii/S1359431126027973)
 
 Several multifidelity machine learning methods are evaluated for predicting the time to onset of natural circulation (ONC) and the temperature after ONC for an HTGR DLOFC transient, using CFD simulation data at three mesh fidelity levels.
 
@@ -15,6 +16,10 @@ Several multifidelity machine learning methods are evaluated for predicting the 
 ```
 multifidelity_methods_clean/
 │
+├── ONC_data/                    # CFD simulation data 
+│   ├── high_fidelity/
+│   ├── medium_fidelity/
+│   └── low_fidelity/
 ├── twofid_methods/              # 2-fidelity MFNN implementations
 │   ├── MFGP_2f.py               # Multifidelity Gaussian Process (co-kriging)
 │   ├── GPmimic_2f.py            # GPmimic neural network
@@ -74,22 +79,7 @@ pip install torch numpy pandas scikit-learn matplotlib tqdm pyyaml mf2 h5py
 
 ## Data
 
-ONC simulation data is not included in this repository. The dataset consists of 1000 CFD simulation samples at each of three mesh fidelity levels (LF: 17,500 elements, MF: 35,000 elements, HF: 70,000 elements), generated using Ansys Fluent. Data is available from the authors upon request.
-
-Place data at the project root before running:
-
-```
-ONC_data/
-├── high_fidelity/
-│   ├── inputs.csv
-│   └── outputs.csv
-├── medium_fidelity/
-│   ├── inputs.csv
-│   └── outputs.csv
-└── low_fidelity/
-    ├── inputs.csv
-    └── outputs.csv
-```
+ONC simulation data is included in this repository. The dataset consists of 1000 CFD simulation samples at each of three mesh fidelity levels (LF: 17,500 elements, MF: 35,000 elements, HF: 70,000 elements), generated using Ansys Fluent. 
 
 ---
 
@@ -168,10 +158,11 @@ All entry-point scripts set environment variables to limit CPU thread usage befo
 
 ```bibtex
 @article{eaheart2026multifidelity,
-  title={Multifidelity Surrogate Modeling of Depressurized Loss of Forced Cooling 
-         in High-temperature Gas Reactors},
-  author={Eaheart, Meredith and Radaideh, Majdi I.},
-  journal={arXiv preprint arXiv:2603.14143},
-  year={2026}
+  title={Multifidelity surrogate modeling of onset of natural circulation following a depressurized loss of forced cooling in high-temperature gas reactors},
+  author={Eaheart, Meredith and Radaideh, Majdi I},
+  journal={Applied Thermal Engineering},
+  pages={132489},
+  year={2026},
+  publisher={Elsevier}
 }
 ```
