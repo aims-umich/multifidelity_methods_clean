@@ -86,10 +86,9 @@ run:
   twofid:
     n_low: 250
     n_high: 50
-    n_low_hartmann6: 800   # larger for 6D
+    n_low_hartmann6: 800
     n_high_hartmann6: 150
-    seed_offset: 13        # seed = seed_offset + benchmark_index
-
+    seed_offset: 13
   threefid:
     n_low: 1000
     n_medium: 300
